@@ -1,6 +1,6 @@
 # 🏠 Système de Scraping Immobilier - Togo
 
-Système automatisé de scraping et de stockage des annonces immobilières togolaises dans une base de données PostgreSQL.
+Système automatisé de scraping et de stockage des annonces immobilières togolaises dans une base de données Mysql.
 
 ## 📍 Sources de données
 
