@@ -1,241 +1,259 @@
-# 🏠 Système de Scraping Immobilier - Togo
+﻿# Real Estate Data Pipeline - Togo
 
-Système automatisé de scraping et de stockage des annonces immobilières togolaises dans une base de données Mysql.
+Pipeline de collecte et de diffusion d'annonces immobilières togolaises.
+Le projet combine ingestion de données, stockage structuré MySQL, API REST (FastAPI) et tableau de bord Streamlit.
 
-## 📍 Sources de données
+## Executive Summary
 
-### 1. **Coin Afrique** 
-- Site: https://tg.coinafrique.com/categorie/immobilier
-- Fichier: `extract-data-2026-02-21-Coin-Afrique.json`
+Ce projet répond à un besoin simple: centraliser des annonces immobilières multi-sources dans un format exploitable pour la recherche, l'analyse et la visualisation.
 
-### 2. **IGOE Immobilier**
-- Site: https://www.igoeimmobilier.com/
-- Fichier: `extract-data-2026-02-21-igoe-immobilier.json`
+Points forts:
+- ingestion de plusieurs sources avec normalisation des champs,
+- persistance relationnelle via SQLAlchemy + MySQL,
+- API REST paginée avec filtres (source, prix, recherche texte),
+- exécution planifiée toutes les 20 minutes avec APScheduler,
+- interface Streamlit pour consultation rapide.
 
-### 3. **Intendance.tg**
-- Site: https://intendance.tg/
-- Fichier: `extract-data-2026-02-21-intendance-tg.json`
+## Architecture
 
-### 4. **OmniSoft API** (optionnel)
-- API: https://devapi.omnisoft.africa/public/api/v2
-- Données disponibles pour intégration future
-
-## 📋 Structure du projet
-
+```text
+JSON sources (Coin Afrique, IGOE, Intendance)
+            |
+            v
+ DonneesScrapper/python.py (extraction + normalisation)
+            |
+            v
+ DonneesScrapper/Scheduler.py (orchestration périodique)
+            |
+            v
+ Application/models.py + database.py (SQLAlchemy + MySQL)
+            |
+            +--> Application/api.py (FastAPI)
+            |
+            +--> streamlit_app.py (dashboard)
 ```
+
+## Stack Technique
+
+- Python 3.8+
+- SQLAlchemy 2.x
+- MySQL 8+ (driver PyMySQL)
+- APScheduler
+- FastAPI + Uvicorn
+- Streamlit
+
+Dépendances: voir `requirements.txt`.
+
+## Sources de Données
+
+- Coin Afrique: https://tg.coinafrique.com/categorie/immobilier
+- IGOE Immobilier: https://www.igoeimmobilier.com/
+- Intendance.tg: https://intendance.tg/
+
+Fichiers d'entrée disponibles dans `DonneesScrapper/` (`*.json`, `*.csv`).
+
+## Structure du Projet
+
+```text
 Application/
-├── database.py        # Configuration PostgreSQL et sessions
-├── models.py          # Modèle SQLAlchemy RealEstateAnnouncement
-├── main.py            # Point d'entrée principal
-└── importer.py        # Fonctions utilitaires d'import
+├── api.py
+├── database.py
+├── importer.py
+├── main.py
+└── models.py
 
 DonneesScrapper/
-├── python.py          # Logique de scraping des fichiers JSON
-├── Scheduler.py       # Tâches planifiées (APScheduler)
-└── *.json             # Fichiers de données scrappées
+├── python.py
+├── Scheduler.py
+└── *.json / *.csv
+
+streamlit_app.py
+requirements.txt
+.env.example
+README.md
 ```
 
-## 🔧 Configuration
+## Modèle de Données
 
-### Prérequis
-- Python 3.8+
-- PostgreSQL 12+
-- Packages Python:
-  ```bash
-  pip install sqlalchemy psycopg2-binary apscheduler
-  ```
+Tables principales:
+- `real_estate_announcements`
+- `coinafrique_announcements`
+- `igoe_announcements`
+- `intendance_announcements`
+- `images`
 
-### Configuration PostgreSQL
+Champs clés d'une annonce:
+- `external_id` (unique)
+- `source`
+- `price`, `price_numeric`
+- `location`, `description`
+- `images`, `citations` (JSON)
+- `source_url`
+- `scraped_at`, `updated_at`
 
-Modifier `Application/database.py`:
-```python
-DATABASE_URL = "postgresql://username:password@localhost/database_name"
-```
+## Quick Start
 
-**Exemple:**
-```python
-DATABASE_URL = "postgresql://postgres:password@localhost/scraper_db"
-```
-
-### Créer la base de données
+### 1. Installer les dépendances
 
 ```bash
-psql -U postgres
-CREATE DATABASE scraper_db;
+pip install -r requirements.txt
 ```
 
-## 🚀 Utilisation
+### 2. Configurer MySQL
 
-### Lancer le scraper
+Configuration actuelle du projet:
+
+```python
+# Application/database.py
+DATABASE_URL = "mysql+pymysql://root@localhost/scrapperDonnee_db"
+```
+
+Créer la base si nécessaire:
+
+```sql
+CREATE DATABASE scrapperDonnee_db;
+```
+
+### 3. Lancer le pipeline de scraping
+
 ```bash
 python -m Application.main
 ```
 
-### API FastAPI
+Comportement au démarrage:
+1. création des tables (si absentes),
+2. scraping initial,
+3. planification automatique toutes les 20 minutes.
 
-Démarrage du serveur :
+### 4. Lancer l'API FastAPI
+
 ```bash
 uvicorn Application.api:app --reload --port 8000
 ```
 
-Points d'accès disponibles :
-- `GET /announcements` (paramètres `source`, `limit`, `min_price`, `max_price`, `q` pour recherche textuelle)
-- `GET /announcements/{external_id}`
-- `GET /images` (option `source`)
-- `GET /statistics`
+- Docs FastAPI: http://localhost:8000/docs
 
-Exemple :
-```bash
-curl "http://localhost:8000/announcements?source=Coin-Afrique&limit=10"
-```
+### 5. Lancer le dashboard
 
-### Visualisation avec Streamlit
-
-Le fichier `streamlit_app.py` consomme l'API et permet d'interagir via une interface web.
-Lancer avec :
 ```bash
 streamlit run streamlit_app.py
 ```
 
-Une fois les deux services actifs (API & Streamlit), utilisez l'interface pour récupérer les annonces, statistiques et images.
+## Aperçu Visuel
 
-Cela va:
-1. ✅ Créer les tables PostgreSQL si nécessaire
-2. 🔄 Exécuter le scraping initial
-3. ⏰ Démarrer le scheduler (exécution toutes les 20 minutes)
+### 1) Interface Streamlit
 
-### Structure des données scrappées
+![Streamlit Dashboard](docs/screenshots/01-streamlit-home.png)
 
-Chaque annonce contient:
-- **ID externe**: Identifiant unique basé sur la source
-- **Source**: (Coin-Afrique, igoe-immobilier, intendance-tg)
-- **Prix**: Prix affiché et valeur numérique en CFA
-- **Localisation**: Quartier/région au Togo
-- **Description**: Détails complets de l'annonce
-- **Images**: Liste des URLs des images
-- **Citations**: URLs sources des données
-- **Timestamps**: Date de scraping et mise à jour
+### 2) Documentation API FastAPI (Swagger)
 
-### Exemple d'annonce en base de données
+![FastAPI Swagger Docs](docs/screenshots/02-fastapi-docs.png)
 
-```python
-{
-    "id": 1,
-    "external_id": "Coin-Afrique_extract-data_0",
-    "source": "Coin-Afrique",
-    "price": "26 000 000 CFA",
-    "price_numeric": 26000000.0,
-    "location": "Lomé, Togo",
-    "description": "Terrain à Agoè-Vakpossito...",
-    "images": ["https://coinafrique-ads-photos.s3.amazonaws.com/..."],
-    "source_url": "https://tg.coinafrique.com/annonce/...",
-    "scraped_at": "2026-02-21T10:30:00",
-    "updated_at": "2026-02-21T10:30:00"
-}
+### 3) Réponse API `/announcements`
+
+![API Announcements Response](docs/screenshots/03-api-announcements.png)
+
+## Référence API FastAPI
+
+### `GET /announcements`
+Filtres disponibles:
+- `source`
+- `page`
+- `per_page`
+- `min_price`
+- `max_price`
+- `q` (texte sur description/localisation)
+
+Exemple:
+
+```bash
+curl "http://localhost:8000/announcements?source=Coin-Afrique&page=1&per_page=10"
 ```
 
-## 📊 Scheduler
+### `GET /announcements/{external_id}`
+Retourne une annonce par identifiant externe.
 
-Le scheduler exécute automatiquement:
-- **Fréquence**: Toutes les 20 minutes
-- **Tâche**: Scraper les fichiers JSON et synchroniser la base de données
-- **Comportement**:
-  - Crée les nouvelles annonces
-  - Met à jour les annonces existantes
-  - Affiche les statistiques de synchronisation
+### `GET /images`
+Retourne la liste des images (avec `source` et `limit` en option).
 
-**Logs du scheduler:**
-```
-==================================================
-🚀 Démarrage du scraping - 2026-02-21 10:30:00
-==================================================
-🔄 Scraping Coin-Afrique depuis extract-data-2026-02-21-Coin-Afrique.json...
-   Source: https://tg.coinafrique.com/categorie/immobilier
-✅ 25 annonces extraites de Coin-Afrique
-...
-📈 Résultats de la synchronisation:
-   ✅ Annonces créées: 15
-   🔄 Annonces mises à jour: 10
-   ❌ Erreurs: 0
-```
+### `GET /statistics`
+Retourne les compteurs par table/source.
 
-## 🔄 Flux de mise à jour
+## Résultats Obtenus
 
-```
-Fichiers JSON (sources) 
-       ↓
-   python.py (parse JSON)
-       ↓
-  models.py (RealEstateAnnouncement)
-       ↓
-  Scheduler.py (APScheduler)
-       ↓
-  database.py (SessionLocal)
-       ↓
-  PostgreSQL (Stockage)
-```
+Résultats observés sur les données actuellement exportées (`Application/exports/`):
 
-## 🛠️ Maintenance
+- Annonces intégrées (`real_estate_announcements`): **34**
+- Source dominante: **Coin-Afrique (34 annonces)**
+- Prix moyen: **66 358 823 CFA**
+- Médiane des prix: **37 500 000 CFA**
+- Fourchette observée: **4 000 000 CFA** à **450 000 000 CFA**
+- Percentile 90 (P90): **~165 000 000 CFA**
 
-### Ajouter une nouvelle source
+Remarque:
+- Les sources `igoe-immobilier` et `intendance-tg` sont présentes dans le pipeline, mais à **0** dans l'export courant.
 
-1. Ajouter le fichier JSON au dossier `DonneesScrapper/`
-2. Modifier `DonneesScrapper/python.py` - mettre à jour `source_mapping`:
-```python
-source_mapping = {
-    'NouvelleSource': {
-        'file': 'extract-data-nouvelle-source.json',
-        'url': 'https://exemple.com/'
-    }
-}
-```
-
-### Requêtes SQL utiles
+## Exemples SQL (Analyse)
 
 ```sql
--- Statistiques par source
-SELECT source, COUNT(*) as count FROM real_estate_announcements GROUP BY source;
+-- Répartition des annonces par source
+SELECT source, COUNT(*) AS count
+FROM real_estate_announcements
+GROUP BY source;
 
--- Annonces les plus chères
-SELECT location, price, price_numeric FROM real_estate_announcements 
-ORDER BY price_numeric DESC LIMIT 10;
+-- Top 10 des annonces les plus chères
+SELECT location, price, price_numeric
+FROM real_estate_announcements
+ORDER BY price_numeric DESC
+LIMIT 10;
 
--- Dernières annonces
-SELECT * FROM real_estate_announcements 
-ORDER BY scraped_at DESC LIMIT 5;
+-- Dernières annonces intégrées
+SELECT *
+FROM real_estate_announcements
+ORDER BY scraped_at DESC
+LIMIT 5;
 ```
 
-## 📝 Notes
+## Qualité et Limites Actuelles
 
-- Les annonces sont identifiées de manière unique par `external_id`
-- Les doublets en base de données sont évités grâce à la clé unique
-- Les prix sont extraits en format numérique pour faciliter les recherches
-- Le système est tolérant aux erreurs (continue même si un fichier manque)
+Ce qui est déjà en place:
+- ingestion résiliente (tolérance à l'absence de certains fichiers),
+- upsert logique (création/mise à jour),
+- API paginée exploitable côté front.
 
-## 🐛 Troubleshooting
+Améliorations possibles:
+- configuration via variables d'environnement (URL DB, intervalle scheduler),
+- tests automatisés (unitaires + intégration),
+- conteneurisation (Docker Compose: API FastAPI + MySQL + Streamlit),
+- observabilité (logs structurés, métriques de job),
+- CI/CD pour validation automatique.
 
-### Erreur de connexion PostgreSQL
-```
+## Dépannage
+
+### Erreur de connexion MySQL
 Vérifier:
-- PostgreSQL est démarré
-- Les identifiants dans DATABASE_URL sont corrects
-- La base de données existe
-```
+- que MySQL est démarré,
+- que `DATABASE_URL` est correct,
+- que `scrapperDonnee_db` existe.
 
-### Fichiers JSON non trouvés
-```
-Le système continuera sans ces fichiers (affichera ⚠️)
-Vérifier que les fichiers sont dans DonneesScrapper/
-```
+### Aucun résultat dans l'API FastAPI
+Vérifier:
+- que le job initial s'est exécuté,
+- que les fichiers JSON sont présents dans `DonneesScrapper/`,
+- les logs de `Application/main.py`.
 
-### Pas de mises à jour
-```
-Vérifier les logs du scheduler
-S'assurer que main.py est en cours d'exécution
-```
+### Dashboard Streamlit vide
+Vérifier:
+- que l'API FastAPI tourne sur `http://localhost:8000`,
+- que l'endpoint `/announcements` retourne des données.
 
 ---
 
-**Dernière mise à jour**: 2026-02-21  
-**Auteur**: INGGBAA  
-**Version**: 1.0
+## Auteur
+
+INGGBAA
+
+## Version
+
+1.2 (Portfolio Edition) - 2 mars 2026
+
