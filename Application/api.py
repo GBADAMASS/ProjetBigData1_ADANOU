@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query
 from typing import List, Optional
+from datetime import datetime
 from pydantic import BaseModel
 from Application.database import SessionLocal
 from Application.models import (
@@ -11,6 +12,16 @@ from Application.models import (
 )
 
 app = FastAPI(title="Immobilier Scraper API")
+
+
+def _row_to_announcement_dict(row) -> dict:
+    """Convert a SQLAlchemy row to a dict compatible with Announcement, handling datetime fields."""
+    d = {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
+    for key in ("scraped_at", "updated_at"):
+        if key in d and d[key] is not None and isinstance(d[key], datetime):
+            d[key] = d[key].isoformat()
+    return d
+
 
 class Announcement(BaseModel):
     id: int
@@ -61,27 +72,23 @@ def get_announcements(
 ):
     db = SessionLocal()
     try:
-        query = db.query(RealEstateAnnouncement)
-        if source:
-            model = SOURCE_TABLES.get(source)
-            if model:
-                query = db.query(model)
-            else:
-                raise HTTPException(status_code=400, detail="Unknown source")
+        model = SOURCE_TABLES.get(source) if source else RealEstateAnnouncement
+        if source and not model:
+            raise HTTPException(status_code=400, detail="Unknown source")
+        query = db.query(model)
         if min_price is not None:
-            query = query.filter(RealEstateAnnouncement.price_numeric >= min_price)
+            query = query.filter(model.price_numeric >= min_price)
         if max_price is not None:
-            query = query.filter(RealEstateAnnouncement.price_numeric <= max_price)
+            query = query.filter(model.price_numeric <= max_price)
         if q:
             pattern = f"%{q}%"
             query = query.filter(
-                RealEstateAnnouncement.description.ilike(pattern) |
-                RealEstateAnnouncement.location.ilike(pattern)
+                model.description.ilike(pattern) | model.location.ilike(pattern)
             )
         total = query.count()
         offset = (page - 1) * per_page
         results = query.offset(offset).limit(per_page).all()
-        items = [Announcement(**r.__dict__) for r in results]
+        items = [Announcement(**_row_to_announcement_dict(r)) for r in results]
         return AnnouncementsResponse(total=total, page=page, per_page=per_page, items=items)
     finally:
         db.close()
@@ -94,7 +101,7 @@ def get_announcement(external_id: str):
         for model in SOURCE_TABLES.values():
             ann = db.query(model).filter(model.external_id == external_id).first()
             if ann:
-                return Announcement(**ann.__dict__)
+                return Announcement(**_row_to_announcement_dict(ann))
         raise HTTPException(status_code=404, detail="Not found")
     finally:
         db.close()
