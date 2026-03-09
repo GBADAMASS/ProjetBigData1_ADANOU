@@ -10,6 +10,7 @@ from Application.models import (
     CoinAfriqueAnnouncement,
     IgoeAnnouncement,
     IntendanceAnnouncement,
+    ImmoaskAnnouncement,
 )
 from DonneesScrapper.python import scrape_source
 
@@ -30,6 +31,7 @@ def save_data_to_db(data, db):
         'Coin-Afrique': CoinAfriqueAnnouncement,
         'igoe-immobilier': IgoeAnnouncement,
         'intendance-tg': IntendanceAnnouncement,
+        'Immoask': ImmoaskAnnouncement,
     }
 
     for record in data:
@@ -45,10 +47,12 @@ def save_data_to_db(data, db):
                 existing.price = record['price']
                 existing.price_numeric = record['price_numeric']
                 existing.location = record['location']
-                existing.description = record['description']
-                existing.images = record['images']
-                existing.source_url = record['source_url']
-                existing.citations = record['citations']
+                existing.description = record.get('description')
+                existing.surface_m2 = record.get('surface_m2')
+                existing.property_type = record.get('property_type')
+                existing.images = record.get('images')
+                existing.source_url = record.get('source_url')
+                existing.citations = record.get('citations')
                 existing.updated_at = datetime.utcnow()
                 db.commit()
                 updated_count += 1
@@ -60,10 +64,12 @@ def save_data_to_db(data, db):
                     price=record['price'],
                     price_numeric=record['price_numeric'],
                     location=record['location'],
-                    description=record['description'],
-                    images=record['images'],
-                    source_url=record['source_url'],
-                    citations=record['citations'],
+                    description=record.get('description'),
+                    surface_m2=record.get('surface_m2'),
+                    property_type=record.get('property_type'),
+                    images=record.get('images'),
+                    source_url=record.get('source_url'),
+                    citations=record.get('citations'),
                 )
                 db.add(announcement)
                 db.commit()

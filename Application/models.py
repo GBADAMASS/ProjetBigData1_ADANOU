@@ -10,11 +10,13 @@ class RealEstateAnnouncement(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     external_id = Column(String(255), unique=True, nullable=False, index=True)
-    source = Column(String(100), nullable=False)  # Coin-Afrique, igoe-immobilier, intendance-tg
+    source = Column(String(100), nullable=False)  # Coin-Afrique, igoe-immobilier, intendance-tg, Immoask
     price = Column(String(100), nullable=True)
     price_numeric = Column(Float, nullable=True)  # Pour les recherches numériques
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
+    surface_m2 = Column(Float, nullable=True)  # Surface en m² (extraite ou native)
+    property_type = Column(String(100), nullable=True)  # Villa, Appartement, Terrain, etc.
     images = Column(JSON, nullable=True)  # Liste des URLs d'images
     source_url = Column(String(500), nullable=True)
     citations = Column(JSON, nullable=True)  # URLs de citation des données
@@ -35,6 +37,8 @@ class CoinAfriqueAnnouncement(Base):
     price_numeric = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
+    surface_m2 = Column(Float, nullable=True)
+    property_type = Column(String(100), nullable=True)
     images = Column(JSON, nullable=True)
     source_url = Column(String(500), nullable=True)
     citations = Column(JSON, nullable=True)
@@ -52,6 +56,8 @@ class IgoeAnnouncement(Base):
     price_numeric = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
+    surface_m2 = Column(Float, nullable=True)
+    property_type = Column(String(100), nullable=True)
     images = Column(JSON, nullable=True)
     source_url = Column(String(500), nullable=True)
     citations = Column(JSON, nullable=True)
@@ -69,6 +75,28 @@ class IntendanceAnnouncement(Base):
     price_numeric = Column(Float, nullable=True)
     location = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
+    surface_m2 = Column(Float, nullable=True)
+    property_type = Column(String(100), nullable=True)
+    images = Column(JSON, nullable=True)
+    source_url = Column(String(500), nullable=True)
+    citations = Column(JSON, nullable=True)
+    scraped_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ImmoaskAnnouncement(Base):
+    """Annonces Immoask (OmniSoft API / immoask.com)"""
+    __tablename__ = "immoask_announcements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String(255), unique=True, nullable=False, index=True)
+    source = Column(String(100), nullable=False, default="Immoask")
+    price = Column(String(100), nullable=True)
+    price_numeric = Column(Float, nullable=True)
+    location = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    surface_m2 = Column(Float, nullable=True)
+    property_type = Column(String(100), nullable=True)
     images = Column(JSON, nullable=True)
     source_url = Column(String(500), nullable=True)
     citations = Column(JSON, nullable=True)

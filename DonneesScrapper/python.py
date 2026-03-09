@@ -11,9 +11,18 @@ Ce module traite les fichiers JSON extraits et les prépare pour la base de donn
 """
 
 import json
-import os
+import sys
 from pathlib import Path
 from typing import List, Dict, Any
+
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+try:
+    from Application.extract_surface_type import extract_from_record
+except ImportError:
+    def extract_from_record(record):
+        return record.get('surface_m2'), record.get('property_type')
 
 def parse_price_to_float(price_val) -> float:
     """Convertir une chaîne ou un nombre en float (exemple: '26 000 000 CFA' -> 26000000.0)"""
@@ -36,7 +45,7 @@ def _get_listings_from_json(json_data: dict) -> list:
     if listings and isinstance(listings, list):
         return listings
     # Clés spécifiques par source
-    for key in ('igoeimmobilier_listings', 'intendance_tg_listings'):
+    for key in ('igoeimmobilier_listings', 'intendance_tg_listings', 'omnisoft_africa_listings'):
         listings = json_data.get(key)
         if listings and isinstance(listings, list):
             return listings
@@ -69,9 +78,12 @@ def scrape_json_file(file_path: str, source_name: str) -> List[Dict[str, Any]]:
         
         if isinstance(listings, list):
             for idx, listing in enumerate(listings):
-                # external_id unique : utiliser l'URL si disponible, sinon index
-                source_url = listing.get('link') or listing.get('price_citation') or listing.get('link_citation')
-                if source_url:
+                # external_id unique : utiliser l'URL ou ID si disponible
+                source_url = listing.get('link') or listing.get('listing_url') or listing.get('price_citation') or listing.get('link_citation')
+                listing_id = listing.get('listing_id')
+                if listing_id and source_name == 'Immoask':
+                    external_id = f"Immoask_{listing_id}"
+                elif source_url:
                     slug = str(source_url).rstrip('/').split('/')[-1] or str(idx)
                     external_id = f"{source_name}_{slug}_{idx}"
                 else:
@@ -92,8 +104,10 @@ def scrape_json_file(file_path: str, source_name: str) -> List[Dict[str, Any]]:
                         desc_parts.extend(specs)
                     description = '. '.join(str(p) for p in desc_parts if p)
                 
-                # Location : Intendance n'a pas de location au même format
-                location = listing.get('location')
+                # Location : Intendance/OmniSoft ont des formats différents
+                location = listing.get('location') or listing.get('address')
+                if not location and (listing.get('city') or listing.get('state')):
+                    location = f"{listing.get('state', '')}, {listing.get('city', '')}".strip(', ')
                 
                 # Prix : formater en chaîne si numérique (pour affichage)
                 price_raw = listing.get('price')
@@ -105,6 +119,21 @@ def scrape_json_file(file_path: str, source_name: str) -> List[Dict[str, Any]]:
                     'description_citation': listing.get('description_citation'),
                 }
                 
+                surface_m2, property_type = extract_from_record(listing)
+                if surface_m2 is None and 'square_footage' in listing:
+                    try:
+                        sf = listing['square_footage']
+                        surface_m2 = float(sf) if sf is not None else None
+                    except (TypeError, ValueError):
+                        pass
+                if surface_m2 is None and 'surface_area' in listing:
+                    try:
+                        surface_m2 = float(listing['surface_area']) if listing['surface_area'] else None
+                    except (TypeError, ValueError):
+                        pass
+                if property_type is None and 'property_type' in listing:
+                    property_type = listing.get('property_type')
+                
                 record = {
                     'external_id': external_id,
                     'source': source_name,
@@ -112,6 +141,8 @@ def scrape_json_file(file_path: str, source_name: str) -> List[Dict[str, Any]]:
                     'price_numeric': parse_price_to_float(price_raw),
                     'location': location,
                     'description': description,
+                    'surface_m2': surface_m2,
+                    'property_type': property_type,
                     'images': images,
                     'source_url': source_url,
                     'citations': citations,
@@ -153,6 +184,10 @@ def scrape_source() -> List[Dict[str, Any]]:
         'intendance-tg': {
             'file': 'extract-data-2026-02-21-intendance-tg.json',
             'url': 'https://intendance.tg/'
+        },
+        'Immoask': {
+            'file': 'extract-data-2026-02-21.json',
+            'url': 'https://www.immoask.com/'
         },
     }
     
